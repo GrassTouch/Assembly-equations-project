@@ -1,0 +1,202 @@
+.data
+List:		.asciiz "List of equations:\n"
+Equation1:	.asciiz "Equation 1: (A AND B) OR C\n"
+Equation2:	.asciiz "Equation 2: (A NOR B) XOR C\n"
+Equation3:	.asciiz "Equation 3: (A XOR B) AND C\n"
+Equation4:	.asciiz "Equation 4: (A + B) - C\n"
+Equation5:	.asciiz "Equation 5: (A - B) * C\n"
+Equation6:	.asciiz "Equation 6: (A * B) / C\n"
+Choice7:	.asciiz "  Choice 7: Exit program.\n"
+
+#Array of pointers to the equations
+Equations: .word Equation1, Equation2, Equation3, Equation4, Equation5, Equation6
+
+Prompt:		.asciiz "Select (1-7): "
+intPrompt1:	.asciiz "Enter an integer A: "
+intPrompt2:	.asciiz "Enter an integer B: "
+intPrompt3:	.asciiz "Enter an integer C: "
+Prompt_result:	.asciiz "Result: "
+invalidPrompt1:	.asciiz "Invalid option. Please select 1-7 only."
+invalidPrompt2:	.asciiz "Invalid option. Please select 1 or 2 only."
+Error:		.asciiz "Error: Division by 0.\n"
+Continue:	.asciiz "\nDo you want to continue? (1=yes/2=no): "
+NewLine:	.asciiz "\n\n\n\n\n\n\n\n\n"
+Exit:		.asciiz "Program Exited...\n"
+
+.text
+.globl main
+main:
+    li $v0, 4
+    la $a0, List
+    syscall
+
+loop_equationList:
+    #List out all the equations
+    # 1.Load base address of Equations array
+    la $t0, Equations	# $t0 = address of Equations array
+    li $t1, 6		# $t1 = total number of equations
+    li $t2, 0		# $t2 = index (counter for loop)
+
+print_equations:
+    beq $t2, $t1, next	# if($t2 = $t1), end loop
+
+    # 2.Load the address of the current equation
+    lw $a0, 0($t0)	# $a0 = address of current equation ($a0 = argument registers for syscall)
+    li $v0, 4		# syscall for print string
+    syscall		# print string
+
+    # 3.Move to the next equation
+    addi $t2, $t2, 1	# Index increment
+    addi $t0, $t0, 4	# Address increment by 4 bytes (size of a word)
+    j print_equations	# Jump to the start of the loop
+
+next:
+    li $v0, 4
+    la $a0, Choice7
+    syscall
+
+    #Prompt user to select an equation
+    li $v0, 4
+    la $a0, Prompt	# $a0 = address of Prompt
+    syscall		# Print Prompt
+
+    #Read selection from user
+    li $v0, 5		# syscall for read 32-bit integer
+    syscall
+    move $t0, $v0	# $t3 = user's choice
+
+    li $t4, 1				#if(choice < 1), invalid
+    blt $t0, $t4, invalid_prompt1
+
+    li $t4, 7				
+    bgt $t0, $t4, invalid_prompt1	#if(choice > 7), invalid
+    beq $t0, $t4, exit			#if(choice = 7), exit
+
+    #Read input A
+    li $v0, 4
+    la $a0, intPrompt1
+    syscall
+    li $v0, 5
+    syscall
+    move $t1, $v0	# $t1 = A
+
+    #Read input B
+    li $v0, 4
+    la $a0, intPrompt2
+    syscall
+    li $v0, 5
+    syscall
+    move $t2, $v0	# $t2 = B
+
+    #Read input C
+    li $v0, 4
+    la $a0, intPrompt3
+    syscall
+    li $v0, 5
+    syscall
+    move $t3, $v0	# $t3 = C
+
+    # Switch based on choice
+    beq $t0, 1, equation1
+    beq $t0, 2, equation2
+    beq $t0, 3, equation3
+    beq $t0, 4, equation4
+    beq $t0, 5, equation5
+    beq $t0, 6, equation6
+
+equation1:
+    #(A AND B) OR C
+    and $t4, $t1, $t2		# $t4 = A AND B
+    or $t4, $t4, $t3		# $t4 = (A AND B) OR C
+    j result			# jump to result
+
+equation2:
+    #(A NOR B) XOR C
+    nor $t4, $t1, $t2		# $t4 = NOT (A OR B)
+    xor $t4, $t4, $t3		# $t4 = [NOT (A OR B)] XOR C
+    j result			# jump to result
+
+equation3:
+    #(A XOR B) AND C
+    xor $t4, $t1, $t2		# $t4 = A XOR B
+    and $t4, $t4, $t3		# $t4 = (A XOR B) OR C
+    j result			# jump to result
+
+equation4:
+    #(A + B) - C
+    add $t4, $t1, $t2		# $t4 = A + B
+    sub $t4, $t4, $t3		# $t4 = (A + B) - C
+    j result			# jump to result
+
+equation5:
+    #(A - B) * C
+    sub $t4, $t1, $t2		# $t4 = A - B
+    mul $t4, $t4, $t3		# $t4 = (A - B) * C
+    j result			# jump to result
+
+equation6:
+    #(A * B) / C
+    beq $t3, $zero, error	# if c = 0, cannot execute division
+    mul $t4, $t1, $t2		# $t4 = A * B
+    div $t4, $t3		# (A * B) / C
+    mflo $t4			# $t4 = quotient of (A * B) / C  (ignore remainder)
+    j result			# jump to result
+
+result:
+    #Print result
+    li $v0, 4			# syscall print string
+    la $a0, Prompt_result	# $a0 = address of Prompt_result (in data section)
+    syscall
+
+    li $v0, 1			#syscall print integer
+    move $a0, $t4		# $a0 = $t4
+    syscall			# print $a0
+    j continue
+
+invalid_prompt1:		#invalid selection for equation
+    li $v0, 4
+    la $a0, invalidPrompt1
+    syscall
+    j continue
+
+invalid_prompt2:		#invalid selection for continue
+    li $v0, 4
+    la $a0, invalidPrompt2
+    syscall
+    j continue
+
+error:				#division error (divide by 0)
+    li $v0, 4
+    la $a0, Error
+    syscall
+    j continue
+
+continue:			#ask user want to continue or not
+   li $v0, 4
+   la $a0, Continue
+   syscall
+
+   li $v0, 5
+   syscall
+   move $t0, $v0
+
+   li $t4, 1				#if(choice < 1), invalid
+   blt $t0, $t4, invalid_prompt2
+
+   li $t4, 2				
+   bgt $t0, $t4, invalid_prompt2	#if(choice > 2), invalid
+
+   beq $t0, 2, exit			#if(choice = 2), exit
+
+   li $v0, 4
+   la $a0, NewLine
+   syscall
+
+   j main				#choice = 1, so back to main
+
+exit:				#Exit program
+    li $v0, 4
+    la $a0, Exit
+    syscall
+    li $v0, 10			#syscall exit program
+    syscall
